@@ -1,0 +1,389 @@
+sudo lsof -i:端口号 //查询端口号是否被使用
+
+sudo pwdx 进程号  //查询端口号路径文件
+
+mysql -u用户名 -p密码 -hIP地址 //登录数据库
+
+dircolors -p > 文件名  (编辑后重启,完成操作)   //生成颜色修改文件
+
+winddows: ipconfig/all //显示全部网路信息(含DNS)
+
+apt install ssh //安装SSH
+
+select user,host from mysql.user; //显示数据库全部用户和权限
+
+address	//IP地址
+netmask //子网掩码
+gateway //默认网关
+dns-nameserver //DNS服务器地址
+
+mysql的binlog日志主要用于主从复制以及增量恢复(必须打开log-bin功能才能生成binlog日志)
+
+打开log-bin功能
+编辑my.cnf文件
+log-bin = /data/3306/mysql-bin
+
+查询是否使用了日志
+show variables like 'log-bin' //binlog是二进制文件无法直接查看
+-d //database = 指定库的binlog
+-r //重新定向到指定文件
+--start-position --stop-position//按照指定位置解析binlog[精确]不接--stop-position则至结尾
+--start-datetime --stop-datetime//按照指定时间解析binlog[模糊]不接--stop-datetime则至结尾
+
+binlog 三种模式
+row level:日志中记录每一行被修改的情况,在salve端对相同的数据进行修改
+优:清楚记录每一行修改的细节
+缺:数据量太大
+
+statement level(默认)
+每一天被修改数据的sql都会被记录到master的binlog中,slave在复制的时候会解析成和原来master端执行过相同的sql再执行一次
+优:解决row level下数据量太大的特点,不需要记录每一条的变化,减少bin-log的日志量,节约磁盘IO,提高性能
+缺:会在某些情况下导致master-salve中的数据不一致(select()函数 last_insert_id()函数 user_defined function()函数)
+
+mixed(混合模式)
+结合了row level 和 statement level 的特点
+
+使用mysql功能较少 建议statement level
+使用mysql特殊功能 建议mixed
+使用mysql特殊功能,希望数据最大化 建议row1 level
+(特殊功能:存储过程 触发器 函数)
+
+mysql设置binlog模式
+show global variables like "binlog%"
+
+查看binlog模式
+set global binlog_format = 'ROW' //设置为row
+
+配置文件中设置binlog模式
+一般在my.cnf
+[mysqld]
+binlog_format = 'ROW' //配置完成需要重启mysql服务
+
+ROW模式下解析binlog日志
+mysqlbinlog --base64 -output="decode-rows"-v mysql-bin.000001
+
+设置日志路径(需要权限)
+log-bin = /data/mysql/logs/mysql-binlog
+
+设置binlog清理时间
+expire_logs_days = 7
+
+binlog每个文件日志大小
+max_binlog_size = 100m
+
+binlog缓存大小
+binlog_cache_siez = 4m
+
+最大binlog缓存大小
+max_binlog_cache_size = 512m
+
+无论是增量备份还是主从复制,都是需要开始mysql-binlog日志
+最好跟数据目录设置到不同的磁盘分区,可以降低id等待
+提升性能,并且在磁盘故障中可以使用mysql-binlog恢复数据
+
+开始事物的时间
+SET TIMESTAMP = 1350355892
+说明开始时间在1350355892
+
+sqlevent 起点
+#at 1643330 //为事件的起点 是以1643330字节开始
+
+sqlevent 发生的时间点
+#121016 10:51:32 //事件发生的时间点
+
+serverId
+server id 1 //master的server id
+
+sqlevent 终点及花费时间,错误码
+end_log_pos 1643855 //事件的终点 是以1643885字节结束
+
+execTime 0 //花费的时间
+
+error_code = 0 //错误码
+
+xid // 事件指示提交的XA事物
+
+mysql修改严格模式
+在my.cnf文末加入
+sql-mode = NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+
+cd /etc/apt //跳转至源目录
+修改source.list进行deb代码替换
+
+ldd(不是一个可执行程序是一个shell脚本):
+ldd能够显示执行模块的dependency
+用于打印程序或者库文件所依赖的共享库列表
+
+ERROR 2003(HY000)Can`t connect to MySQL server on "host"(111)
+默认情况下值允许本地登录,所以需要本地修改配置文件将地址绑定注释掉
+
+修改etc/mysql/my.cnf
+将bind-address = 127.0.0.1(注释掉)  -> #bind-address = 127.0.0.1
+sudo server mysql restart //重启数据库
+
+svn操作:
+svn --version 查看svn版本
+svn checkout path(服务器地址)
+例: svn checkout svn://192.168.1.1/pro/main --缩写--> svn co svn://192.168.1.1/pro/main
+
+往版本库中添加新文件
+svn add file
+例: svn add test.php //添加test.php 
+svn add *.php //添加目录下所有的php文件
+
+将改动的文件提交到版本库
+svn commit -m "LogMessage" path
+例: svn commit -m "add test for my test" test.php --缩写--> svn ci -m "add test for my test" test.php
+
+svn加锁
+svn lock -m "LockMessage" path
+例: svn lock -m "lock test file" test.php
+svn unlock path
+例: svn unlock test.php
+
+svn更新版本
+svn update -rm path 
+svn update //如果后面没有目录,默认将当前目录以及子目录下所有文件更新到最新版本
+例: svn update -r 200 test.php --缩写--> svn up -r 200 test.ph//将版本库中的文件test.php还原到版本200
+
+svn update test.php  --缩写--> svn up test.php
+更新于版本库同步,如果提示过期的话,因为文件冲突,需要先update 修改文件,然后清除svn reload 最后体积commit
+
+svn status path  --缩写--> svn st path//查看文件或者目录状态
+?		不在svn中
+M       内容被修改
+C       发生冲突
+A       预定加入到版本库中
+K       被锁定
+
+svn status -v path --缩写--> svn st -v path
+显示文件和子目录状态
+第一列  M/?/C/A/K
+第二列  显示工作版本号
+第三列  显示最后一次修改的版本号
+第四列 	显示最后一次修改的修改人
+
+svn status/diff/revert //在没有网络情况下也可以使用(svn在本地)
+
+删除文件
+svn delete path -m "delete test file"
+例: svn delete svn://192.168.1.1/pro/domain/test.php -m "delete test.php"  --缩写--> svn del svn://192.168.1.1/pro/domain/test.php -m "delete test.php"
+
+例: svn delete test.php  --缩写-->  svn del test.php
+	svn ci -m "delete test file"
+
+查看日志
+svn log path 
+例: svn log test.php //显示这个文件所有的修改记录及其版本号的变化
+
+查看文件详细信息
+svn info path
+例: svn info test.php
+
+比较差异
+svn diff path //将修改的文件与基础版本比较
+例: svn diff test.php
+svn diff -r m:n path //对比m版本和n版本差异
+例: svn diff -r 100:101 test.php --缩写--> svn di -r 100:101 test.php
+
+将两个版本之间的差异合并到到当前文件
+svn merge -r m:n path  //将版本m与版本n的差异合并到到当前文件(但是一般会产生冲突需要处理一下)
+svn merge url -r xxxx:yyyy (合并版本, url为代码地址 xxxx yyyy为版本,不包括xxxx)
+
+svn帮助
+svn help
+例: svn help ci
+
+版本库下的文件和目录列表
+svn list path
+
+显示path目录下的所有属于版本库的文件和目录
+svn ls
+
+创建纳入版本控制下的新目录
+svn mkdir path
+svn mkdir URL
+创建版本控制目录
+每一个以工作副本path指定的目,都会创建在本地端,并且加入新增调度,以待下一次提交
+每个URL指定的目录都会透过立即提交于仓库中创建(所有中间目录必须提前存在)
+
+恢复本地修改
+svn_revert //恢复原始始末未改变的工作副本文件[恢复大部分本地修改]
+
+svn revert path //子命令不会存取网络,并且会杰出冲突状况,但它不会恢复被删除的目录
+
+代码库URL变更
+svn switch(sw) //更新工作副本至不同的URL
+svn switch URL path 
+svn switch -relocate from to path 
+
+svn switch URL //更新工作副本映射到一个新的URL,其行为跟svn update很像,也会将服务器上文件与本地合并
+[这是将本地工作副本对应到同一仓库中某个分歧或者标记的方法] 
+
+svn switch -relocate from to //改变工作副本URL元数据,以反映单纯的URL的改变.当仓库的根URL变动,但是工作副本仍旧对映到同一仓库的同一目录时,使用这个命令更新工作副本的对应关系
+例: svn switch -relocate http://59.41.99.254/mtt http://59.41.99.254/mytt
+
+解决冲突
+svn resolved //移除工作副本的目录和文件的冲突状态
+svn resolved path //子命令不会依据语法来解决冲突或是移除冲突标记,它只是移除冲突的相关文件,然后让path可以再次提交
+
+输出指定文件或者URL的内容
+svn cat 目标[@版本] //如果指定了版本,将从指定的版本开始查找
+svn cat -r prev filename > filename //prev是上一版本 也可以具体写版本号,这样输出结果是可以提交的
+
+svn cleanup
+查找工作拷贝中的所有遗留的日志文件,删除进程中的锁,如果svn告诉你工作拷贝中的一部分已经锁定了,需要执行这个命令
+
+svn使用L显示锁定的项目
+例:
+svn status								svn status
+L somedir 			--svn cleanup-->  	M somedir.foo.c
+M somedir.foo.c
+
+svn import //拷贝用户的一个未被版本化的目录树到版本库最快的方法[在导入之后,原来的目录树并没有转化成工作拷贝,为了开始工作,还是需要运行svn checkout导出一个工作拷贝]
+
+Linux版本
+3.10.0-123.e17.x86_64
+主版本-次版本.释出版本.修改版本
+
+more 显示文件
+Enter 翻页
+b 回滚翻页
+-n 显示行数
+q 退出
+
+head -n 数字 文件名 //查看文件前几行
+tail -n 数字 文件名 //查看文件后几行
+
+grep 查找文件内容
+例: grep un day //在day文件中查找含有un的行
+	grep un day weather //在day weather文件中查找含有un的行
+
+find path -name "*.c" //把path下所有扩展名.c的文件列出来
+find path -type f //把path下所有一般文件列出来
+find path -ctime -20 //把path下所有20天内更新的文件列出来
+
+locate //定位文件
+locate file //定位文件file
+locate -d database file //指定数据库database定位文件file
+
+whereis //查找特定程序
+例: whereis find //查找find命令
+-b //查找二进制文件
+-m //查找帮助文件
+
+who //查找系统哪些人登录
+whoami //查看自己什么身份登录
+
+man //获取命令的帮助信息
+例: man find //获取find的帮助信息
+
+su 用户 //切换用户
+
+mkdir folder //建立空的folder文件夹
+
+mv //移动和重命名
+mv file folder/ //移动file到folder
+mv file file1 //将file重命名为file1
+
+cp file folder //复制file到folde
+cp file folder/file1 //复制file到folder并且重命名为file1
+cp -r folder1/ folder2/ //将folder1所有子文件复制到folder2
+
+rmdir folder //删除目录folder[空目录] 
+rm -r folder 删除这个文件夹
+
+chown //改变文件所有权
+chown root file //修改主权限
+chown :group file //修改组权限
+-R 将子目录一起修改权限
+chgrp group file //修改组权限
+
+chmod //改变文件权限
+chmod u+x days //增加主对days的执行权限
+chmod a-x days //删除所有人对days的执行权限
+chmod ug=rw, o=r days //赋予主组读写权限,其他人读权限
+[r=4 w=2 x=1]
+chmod 770 days //赋予主组读写执行权限,其他人无权限的days文件
+
+ln //建立链接
+ln -s days my_days //建立一个my_days的符号链接指向文本文件days
+但是my_days不会对days造成影响
+删除days, my_days没有意义
+
+ln days new_days //将days和new_days硬链接
+[直接引用][二者完全独立,只是联系到一起]
+完全相同的内容,对一个文件修改会反映在另一个文件中
+
+输出重定向
+ls > ~/ls_out //将ls的结果输出到ls_out中[如果已经存在ls_out,>会删除原先内容,并用新的内容替代]
+ls >> ~/ls_out //会保留ls_out原来内容,在尾部添加新内容
+
+命令别名设定
+alias lm = 'ls -al | more'
+命令别名取消
+unalias lm
+
+history //显示历史操作
+
+cmd1&&cmd2 //若cmd1执行正确则执行cmd2 若cmd1执行不正确则不执行cmd
+cmd1||cmd2 //若cmd1执行正确则不执行cmd2 若cmd1执行不正确则执行cm不
+
+tee //双向重导向
+tee会将数据流分送到文件与屏幕
+-a //以累加的方式将数据加入file中
+
+tr //可以用来删除一段信中的文字
+tr [a-z]''[A-Z] //将 [a-z]替换成[A-Z]
+-d //删除讯息中的字符串
+tr -d ':' //删除讯息中:
+col //将tab键转换成对等的空格键
+paste //将两行贴在一起,中间以[tab]隔开
+-d //后面可以接分割字符
+
+ps aux //观察系统所有的进程数据
+ps -lA //观察所有系统的数据
+ps axjf //观察系统的所有的进程数据和进程树状态
+-A //所有process均显示处理,与-e具有同样的效用
+-a //不与terminal有关的所有process
+-u //有效使用者相关的process
+x //通常和a一起使用,可以列出完整的信息
+l //较详细的将PID的信息列出
+j //工作的格式 jobs format
+-f //做一个更完整的输出
+
+F:进程旗标
+4 //权限为root
+1 //子进程只是复制并无实行
+
+S:进程状态
+R //正在运作
+S //睡眠状态可被幻想
+D //不可被唤醒的睡眠状态 可能等待IO
+T //停止状态 可能是工作控制或是除错状态
+Z //僵尸状态 进程已经完全终止却无法被移除至内存外
+
+vim:
+ctrl + p //查找
+ctrl + o //回退
+ctrl + i //前进
+:b1 //切换到1:
+ctrl + w h/j/k/l //切换光标
+:vs //横向分栏
+:sp //纵向分栏
+shift + # 向上显示查找所有
+
+cscope:
+cs f s 查找名 //查找目标字符串
+cs f e 查找名 //正则表达式匹配字符串
+cs f f 查找文件 //查找文件
+
+gdb 调试
+查看pid下端口号
+使用sudo权限gdb -p 端口号
+bt //查看调用栈
+info threads //显示当前可调试的所有线程
+set substitute-path from_path to_path //修改文件路径
+本地 /home/tang/server1.2/lobby
+set substitute-path  /home/tangyanduo/server1.2/lobby /home/tang/server1.2/lobby
+layout src //显示代码可操作节面
