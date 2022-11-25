@@ -1,0 +1,231 @@
+服务器fork()两次操作
+
+孤儿进程
+父进程在子进程结束之前死亡(return或exit)
+孤儿进程不会持续很长时间,当系统发现孤儿进程时,init进程就会收养孤儿进程,成为孤儿进程的父进程,子进程exit后的资源回收就都有init进程来完成
+
+僵尸进程
+子进程在父进程之前结束了,但是父进程没有用wait或waitpid回收子进程
+父进程没有回收子进程并不说明它不会回收子进程
+子进程在结束的时候会给父进程发送一个SIGCHILD信号,父进程默认时忽略SIGCHILD信号的(如果父进程通过signal()函数设置了SIGCHILD的信号处理函数,也没关系)
+因为在父进程结束之前,子进程可以一直保持僵尸状态,当父进程结束后,init进程就会负责回收僵尸子进程
+
+在父进程是一个服务器进程,处于一直循环不退出,那子进程就会一直保持僵尸进程状态.
+虽然僵尸进程不会占用任何内存资源,但是过多的僵尸进程会影响系统性能.
+
+为避免子进程child成为僵尸进程,可以为子进程创建子进程,再让子进程的子进程成为正则工资中的子进程的父进程,这样工作中子进程在工作时,子进程的子进程退出,
+这个时候工作中的子进程相当于子进程的子进程产生的孤儿进程,这样孤儿进程会有系统进程init回收,这样工作中进程退出的时候,init会回收工作中进程的资源.不会成为僵尸进程
+
+int main(void)
+{
+	pid_t pid;
+	if ( (pid = fork()) < 0)
+		err_sys( "fork error" );
+	else if ( pid == 0 )
+	{
+		if ( (pid == fork()) < 0)
+			err_sys( "fork error" );
+		else if ( pid < 0 )
+			exit(0);
+
+		sleep(2);
+		printf( "seconf child, parent pid = %d\n", getppid() );
+		exit(0);
+	}
+
+	if ( waitpid(pid, NULL, 0) != pid )
+		err_sys( "waitpid error" );
+
+	exit(0);
+}
+
+守护进程
+运行在后台的一种特殊进程
+周期性地执行某种任务或等待处理某些发生的事件
+
+独立于控制终端
+父进程是1号init(所以守护进程是孤儿进程)
+守护进程是独自成组进程的
+守护进程独自成一个成为会话的首进程或者是一个会话中的进程组
+守护进程的运行不受用户登录和注销的影响
+
+控制终端因为某些原因会发送一些信号,接受到信号的进程去执行这些信号的默认处理动作会导致进程退出
+使进程不能正常的处理某些任务,所以就需要像守护进程这样接受不到信号的进程
+让进程独立与控制终端,执行某些任务或处理某些事件
+
+简单的守护进程
+调用umask将权限掩码设置为0
+调用fork,父进程退出,保证子进程不会使一个进程组的组长
+调用setsid创建一个新的会话(还可以再fork一次).
+将当前创建目录改为根目录
+关闭不需要的文件描述符 (守护进程独立于控制终端)
+忽略SIGCHILD信号
+
+#include <stdio.h>									#include <stdio.h>
+#include <stdlib.h>									#include <stdlib.h>	
+#include <unistd.h>									#include <unistd.h>
+#include <sys/type.h>								#include <sys/type.h>
+#include <sys/stat.h>								#include <sys/stat.h>
+#include <signal.h>									#include <signal.h>
+
+void mydaemon()										void mydaemon()
+{													{
+	umask(0);											umask(0);
+	if(fork() > 0)										if(fork() > 0)	
+		exit(1);											exit(1);
+	setsid();											setsid();
+	chdir("/");											if(fork() > 0)
+	close(0);												exit(1);
+	close(1);											chdir("/");
+	close(2);											close(0);
+	signal(SIGCHILD,SIG_IGN);							close(1);
+}														close(2);
+int main()												signal(SIGCHILD,SIG_IGN);
+{													}
+	mydaemon();										int main()
+	while(1)										{
+	{													mydaemon();
+		sleep(1);										while(1)
+	}													{
+	return 0;												sleep(1);
+}														}
+														return 0;
+													}
+创建守护者进程的过程中
+fork一次,守护进程pid, gid, sid都是相同的,当前守护者进程自成会话, 自成进程组.
+fork两次,pid与gid和sid不同,守护者进程属于某个会话,属于某个进程组(使守护进程更加安全).
+
+父进程
+   |
+   |	  父进程fork出子进程
+   | fork
+   |	  保证了子进程不是组长
+   | 
+子进程  子进程自成会话,自成进程组
+   |	会话首进程拥有打开控制终端的能力
+   |	  
+   | fork
+   |
+   |
+子进程的子进程 子进程的子进程和子进程属于同一进程组
+			  同一个会话,但不是组长,也不是会话首进程
+			  不会关联控制终端
+
+使进程在后台运行
+创建子进程父进程退出
+if ((pid = fork()) > 0)
+	exit(0);
+else if (pid < 0)
+{
+	perror("fail to fork");
+	exit(-1);
+}
+脱离控制终端,登录会话和进程组(创建新会话)
+进程属于一个进程组
+进程组号(gid) = 进程组长的进程号(pid)
+登录会话可以包含多个进程组,这些进程组共享一个控制终端(通常使创建进程的登录终端)
+控制终端,登录会话和进程组通常使从父进程继承下来的
+目的使摆脱他们,不受它们影响,调用setsid()使进程成为会话组长
+
+setsid();
+当进程使会话组长时setsid()调用失败,但是已经保证进程不是会话组长
+setsid()调用成功后,进程成为新的会话组长和新的进程组长,并与原来的登录会话和进程组脱离
+由于会话过程对控制终端的独占性,进程同时与控制终端脱离
+
+禁止进程重新打开控制终端
+进程变为无终端的会话组长
+可以重新申请打开一个控制终端
+可以通过使进程不再成为会话组长来禁止进程重新打开控制终端
+if(pid == fork())
+	exit(0); // 结束第一子进程,第二子进程继续(第二子进程不再会是会话组长)
+
+关闭所有文件描述符
+进程从创建它的父进程那里继承了打开的文件描述符.
+如不关闭,将会浪费系统资源,造成进程所在的文件系统无法卸下以及引起无法预料的错误
+for (i=0; i<= getdtablesize(); i++)
+	close(i);
+
+改变当前工作目录
+进程活动时,其工作所在的文件系统不能卸下.
+一般需要将工作目录改变到根目录
+对于需要转储核心,写运行日志的进程将工作目录改变到特定目录如/tmp
+chdir("/tmp");
+
+重设权限掩码
+进程从创建它的父进程那里继承了文件创建掩码.
+可能修改守护进程所创建的文件的存取位.(为防止这一点,将文件创建掩膜清除)
+umask(0);
+
+处理SIGCHILD信号
+处理SIGCHILD信号(并不是必须),但是对于某些进程(特别是服务器进程往往在请求到来时生成子进程处理请求)
+如果父进程不等待子进程结束,子进程将成为僵尸进程(zombie)从而占用系统资源.如果父进程等待子进程结束,
+将增加父进程的负担,影响服务器进程的并发性能
+signal(SIGCHILD,SIG_IGN);
+内核在子进程结束时不会产生僵尸进程(BDS4下必须显式等待子进程结束才能释放僵尸进程)
+
+创建一个守护进程
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+void init_deamon(void)
+{
+	int pid;
+	int i;
+
+	if (signal(SIGCHILD,SIG_IGN) == SIG_ERR)
+	{
+		printf("Can`t signal in init_daemon");
+		exit(1);
+	}
+
+	if (pid == fork())
+		exit(0);
+	else if (pid < 0)
+	{
+		perror("fail to fork1");
+		exit(1);
+	}	
+
+	setsid();
+	if (pid == fork())
+		exit(0);
+	else if (pid < 0)
+	{
+		perror("fail to fork1");
+		exit(1);
+	}
+	for (i = 0; i < getdtablesize(); ++i)
+		close(i);
+	chdir("/tmp");
+	umask(0);
+	return;
+}
+
+#include <stdio.h>
+#include <time.h>
+
+void init_deamon(void);
+
+void main()
+{
+	FILE *fp;
+	time_t t;
+	init_deamon();
+
+	while(1)
+	{
+		sleep(1);
+		if ((fp == fopen("print_time", "a")) >= 0)
+		{
+			t = time(0);
+			fprintf(fp, "The time right now is : %s", asctime(localtime(&t)));
+			fclose(fp);
+		}
+	}
+	return;
+}
