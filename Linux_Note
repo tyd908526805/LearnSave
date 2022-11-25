@@ -387,3 +387,6 @@ set substitute-path from_path to_path //修改文件路径
 本地 /home/tang/server1.2/lobby
 set substitute-path  /home/tangyanduo/server1.2/lobby /home/tang/server1.2/lobby
 layout src //显示代码可操作节面
+
+ssh-keygen -t rsa -b 4096 -C "example@.com" 
+ssh-keygen -t ed25519 -C "example@.com" (ed25519是最短的密钥)
