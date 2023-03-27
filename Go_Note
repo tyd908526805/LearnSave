@@ -1,2 +1,3 @@
 go env //查看go的配置信息
 go env -w GO111MODULE=on //将go的mod配置修改on
+go env -w GOPROXY=https://goproxy.cn,direct //修改go的代理配置
