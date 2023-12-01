@@ -1,0 +1,11 @@
+#安装netcat
+yum install nc
+
+#查看netcat帮助
+nc --help
+
+#netcat访问目标IP端口
+nc 192.168.213.131 9995
+
+#libevent缺少openssl报错
+yum install openssl-devel
