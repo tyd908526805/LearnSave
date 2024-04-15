@@ -1,0 +1,3 @@
+System: Centos7
+install: yum intall snappy-devel
+build: g++ -o compress main.cpp -lsnappy
