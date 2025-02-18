@@ -390,3 +390,6 @@ layout src //显示代码可操作节面
 
 ssh-keygen -t rsa -b 4096 -C "example@.com" 
 ssh-keygen -t ed25519 -C "example@.com" (ed25519是最短的密钥)
+
+统计文件关键字出现次数
+grep -o "失败" test_new_2.log | wc -l
